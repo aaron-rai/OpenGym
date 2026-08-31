@@ -8,6 +8,7 @@ import { bwSheet, goalSheet, dayOverrideSheet, calendarSheet, startFlow, loadSta
 import LineChart from '../components/LineChart.jsx'
 import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
+import { tappable } from '../lib/use-sheet-keyboard.js'
 import { glyphOf } from '../lib/glyphs.js'
 
 // Home = what to do now + a quick glance. Deep charts & history live in Stats.
@@ -26,13 +27,16 @@ export default function Home() {
 
   const monday = new Date(today); monday.setDate(today.getDate() - ((today.getDay() + 6) % 7) + weekOffset * 7)
   const doneDays = new Set(S.workouts.map(w => w.d))
+  // The last session logged for today, if any — what the row below reports instead of asking
+  // you to start the one you already did. Last wins, so a second session names itself.
+  const doneToday = S.workouts.filter(w => w.d === todayISO()).at(-1) || null
   const strip = []
   for (let i = 0; i < 7; i++) {
     const d = new Date(monday); d.setDate(monday.getDate() + i)
     const iso = isoOf(d)
     const eff = effectiveRoutineId(S, iso), ovr = S.dayPlan[iso] !== undefined, done = doneDays.has(iso)
     const dot = done ? ' done' : ovr && eff ? ' ovr' : eff ? ' plan' : ''
-    strip.push(<div key={i} className={'wday' + (iso === todayISO() ? ' today' : '')} onClick={() => dayOverrideSheet(iso)}>
+    strip.push(<div key={i} className={'wday' + (iso === todayISO() ? ' today' : '')} {...tappable(() => dayOverrideSheet(iso))}>
       <div className="lbl">{t(DAYS[d.getDay()])}</div><div className="num">{d.getDate()}</div><div className={'dot' + dot} /></div>)
   }
   const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6)
@@ -58,17 +62,26 @@ export default function Home() {
         <button className="iconbtn" style={{ width: 30, height: 30, fontSize: 15 }} onClick={() => setWeekOffset(w => w + 1)} aria-label="Next week"><Icon name="chevronRight" /></button>
       </div>
       <div className="week">{strip}</div>
-      <div className="today-row" onClick={onToday}>
+      {/* Once today's session is logged the row stops asking for it. The week strip already
+          knew (its dot goes 'done'); this row did not, so a finished day kept showing the
+          routine name behind a green Start tag and read as still outstanding (issue #4).
+          An in-progress session still wins — that one is happening right now. Tapping the
+          row keeps working, so a second session in one day is a tap away, just not urged. */}
+      <div className="today-row" {...tappable(onToday)}>
         <div className="row" style={{ gap: 9, minWidth: 0 }}>
-          <span className="lrow-i" style={{ background: S.active ? 'var(--orange)' : routine ? 'var(--acc)' : 'var(--surface-3)' }}>
-            <Icon name={S.active ? 'timer' : routine ? glyphOf(routine.emoji) : 'moon'} />
+          <span className="lrow-i" style={{ background: S.active ? 'var(--orange)' : doneToday ? 'var(--surface-3)' : routine ? 'var(--acc)' : 'var(--surface-3)' }}>
+            <Icon name={S.active ? 'timer' : doneToday ? 'checkCircle' : routine ? glyphOf(routine.emoji) : 'moon'}
+              style={doneToday && !S.active ? { color: 'var(--green)' } : undefined} />
           </span>
           <div style={{ minWidth: 0 }}>
             <div className="lbl2">{t('Today')}</div>
-            <div className="ttl">{S.active ? t('{0} — in progress', S.active.name) : routine ? routine.name : t('Rest day')}{todayOvr && routine ? ' · ' + t('rescheduled') : ''}</div>
+            <div className="ttl">{S.active ? t('{0} — in progress', S.active.name)
+              : doneToday ? (doneToday.name ? t('{0} — done', doneToday.name) : t('Workout done'))
+              : routine ? routine.name : t('Rest day')}{todayOvr && routine && !doneToday ? ' · ' + t('rescheduled') : ''}</div>
           </div>
         </div>
         {S.active ? <span className="tag" style={{ color: 'var(--orange)', background: 'color-mix(in srgb,var(--orange) 16%,transparent)' }}>{t('Resume')}</span>
+          : doneToday ? <span className="tag" style={{ color: 'var(--green)', background: 'color-mix(in srgb,var(--green) 16%,transparent)' }}>{t('Done')}</span>
           : routine ? <span className="tag acc">{t('Start')}</span>
           : <Icon name="plus" className="chev" />}
       </div>
@@ -116,7 +129,7 @@ export default function Home() {
       </> : <div className="muted small">{t("No entries yet — log your weight to start the curve. It's also asked before every workout.")}</div>}
     </div>
 
-    <div className="card tappable" style={{ cursor: 'pointer' }} onClick={() => calendarSheet()}>
+    <div className="card tappable" style={{ cursor: 'pointer' }} {...tappable(() => calendarSheet())}>
       <div className="row between">
         <div>
           <div className="row" style={{ gap: 7, fontSize: 22, fontWeight: 600, letterSpacing: '-.021em' }}>
