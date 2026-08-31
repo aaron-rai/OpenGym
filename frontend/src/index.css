@@ -183,7 +183,15 @@ body.resting #app{padding-bottom:calc(250px + var(--sab))}
   transition:background var(--fast),transform var(--fast);
 }
 .iconbtn:active{background:var(--surface-2);transform:scale(.92)}
+/* invisible hit-area extension: these look right at their size but fall short of a
+   finger-sized target, so the pseudo element widens what the tap lands on without
+   changing the painted box. Segmented buttons sit flush against each other, so they
+   only grow vertically or the neighbour would steal the edge of the tap. */
+.iconbtn,.chip,.seg button,.helpbtn{position:relative}
+.iconbtn::before,.chip::before,.seg button::before,.helpbtn::before{content:'';position:absolute;inset:-6px}
+.seg button::before{inset:-6px 0}
 .iconbtn.on-ss{background:var(--acc-soft);color:var(--acc)}
+.iconbtn:disabled{opacity:.32}
 
 h4.sec{
   font-size:13px;font-weight:400;letter-spacing:-.004em;color:var(--label-2);
@@ -235,12 +243,27 @@ h4.sec{
 .lrow-s{font-size:13px;color:var(--label-2);line-height:1.3}
 /* flex:none would let a long value ("Follow the routine (Linear progression)") run straight
    through the title next to it, since the title's column is already free to shrink to nothing.
-   Letting the value shrink and ellipsise instead keeps the two out of each other's way. */
-.lrow-v{color:var(--label-2);font-size:17px;letter-spacing:-.012em;flex:0 1 auto;min-width:0;
+   Letting the value shrink and ellipsise instead keeps the two out of each other's way.
+   The cap is max-width, not flex-basis: .lrow-m is flex:1, so its basis is 0 and it absorbs
+   none of the shrink — a long value would otherwise take the whole row and squeeze the title
+   to 21px. A basis of 45% fixes that but reserves the space even for "3", costing the title
+   141px on the rows that need it most. A cap does neither. */
+.lrow-v{color:var(--label-2);font-size:17px;letter-spacing:-.012em;flex:0 1 auto;max-width:45%;min-width:0;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}
 .lrow-c{color:var(--label);font-size:15px;flex:none;--icon-stroke:2.4}
 .lrow-k{color:var(--acc);font-size:17px;flex:none;--icon-stroke:2.4}
 .lrow.danger,.lrow.danger .lrow-t{color:var(--red)}
+/* The Stats exercise name gets its own line so long names cannot run into the title.
+   Two columns only — label/value on the left, chevron on the right — so this is for rows
+   WITHOUT an icon. `.lrow-i` is not placed here; on a row that has one it would auto-place
+   into the grid and push the layout around. Give it a leading column before using this
+   anywhere else. */
+.lrow.lrow-stack-value{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto;
+}
+.lrow.lrow-stack-value .lrow-m{grid-column:1;grid-row:1}
+.lrow.lrow-stack-value .lrow-v{grid-column:1;grid-row:2;text-align:left}
+.lrow.lrow-stack-value .lrow-c{grid-column:2;grid-row:1 / span 2;align-self:center}
 /* an (i) before a row's control: painted small and dim so the control stays the loud thing,
    but with a finger-sized target like everything else — the padding is the hit area and the
    vertical negative margin keeps it from making the row taller. The horizontal ones pull the
@@ -272,15 +295,21 @@ h4.sec{
 .btn:disabled{opacity:.32;pointer-events:none}
 
 /* ----------------------------------------------------------- tab bar ----- */
+/* Nearly opaque, and deliberately so. At the old 72% the page read straight through the bar
+   and the labels had to compete with whatever was scrolling behind them — nobody needs to read
+   the content under a navigation bar. 94% keeps a hint of movement behind the glass without
+   letting text through. The blur is also down from 24px to 10px: this is a fixed element, so
+   the WebView recomposites the blurred region on every scroll frame, and on Android that is
+   the single most expensive thing on the screen. See @supports below for the no-blur case. */
 #tabbar{
   position:fixed;left:0;right:0;bottom:0;z-index:50;
   display:flex;justify-content:space-around;align-items:flex-end;
   padding:7px 6px calc(6px + var(--sab));
-  background:color-mix(in srgb,var(--bg-el) 72%,transparent);
-  backdrop-filter:saturate(180%) blur(24px);-webkit-backdrop-filter:saturate(180%) blur(24px);
+  background:color-mix(in srgb,var(--bg-el) 94%,transparent);
+  -webkit-backdrop-filter:saturate(180%) blur(10px);backdrop-filter:saturate(180%) blur(10px);
   border-top:var(--hair) solid var(--sep-op);
 }
-:root[data-theme="light"] #tabbar{background:rgba(249,249,251,.78)}
+:root[data-theme="light"] #tabbar{background:rgba(249,249,251,.94)}
 #tabbar button{
   flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
   color:var(--label-3);font-size:10px;font-weight:500;letter-spacing:.005em;padding-top:3px;
@@ -317,6 +346,21 @@ h4.sec{
 }
 @keyframes ping{0%{transform:scale(1);opacity:.7}100%{transform:scale(1.45);opacity:0}}
 
+/* NOTE on every backdrop-filter pair in this file: the -webkit- line comes first and the
+   standard property last, which is the order a prefixed/standard pair wants — whichever is
+   written last wins in the cascade, and that should be the standard name.
+
+   Where backdrop-filter is genuinely unsupported there is no glass either — only the alpha,
+   and the page shows through unblurred, which is the worst of both. Older Android WebViews
+   never had it, and "reduce transparency" accessibility settings drop it. Those surfaces go
+   fully opaque instead. Keep this in sync with the rules above. */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  #tabbar{background:var(--bg-el)}
+  :root[data-theme="light"] #tabbar{background:#f9f9fb}
+  #timer{background:var(--surface)}
+  #toast{background:var(--surface-2)}
+}
+
 /* ------------------------------------------------------------ week strip -- */
 .week{display:flex;justify-content:space-between;gap:4px}
 .wday{
@@ -344,7 +388,20 @@ h4.sec{
   transition:background var(--fast);text-align:left;width:100%;
 }
 .item:active{background:var(--surface-2)}
+.routine-list{position:relative}
+.routine-drag-row{touch-action:pan-y;-webkit-touch-callout:none;position:relative;transition:transform var(--fast) var(--ease)}
+.routine-list.is-reordering{user-select:none;-webkit-user-select:none}
+.routine-list.is-reordering .routine-drag-row{transition:none}
+.routine-drag-row.is-dragging{z-index:2;pointer-events:none}
+.routine-drag-row.is-dragging .item{box-shadow:0 10px 28px rgba(0,0,0,.22);background:var(--surface-2)}
+.routine-drop-indicator{
+  position:absolute;left:6px;right:6px;height:3px;border-radius:99px;
+  background:var(--acc);transform:translateY(-50%);pointer-events:none;z-index:3;
+}
 .thumb{width:50px;height:50px;border-radius:9px;object-fit:cover;background:#fff;flex:none}
+/* exercise pictures are decoration inside tappable rows/cards: no save-image callout on
+   a long press and no drag ghost when a scroll starts on the picture */
+.thumb,.exmedia img{-webkit-touch-callout:none;-webkit-user-drag:none;user-select:none;-webkit-user-select:none}
 .thumb-x{
   display:flex;align-items:center;justify-content:center;font-size:21px;
   background:var(--surface-2);color:var(--label-2);
@@ -366,6 +423,14 @@ h4.sec{
   scrollbar-width:none;-webkit-overflow-scrolling:touch;
 }
 .chips::-webkit-scrollbar{display:none}
+/* horizontal strips: keep a sideways overscroll from chaining to the page and leave a
+   margin when a chip is scrolled into view. The chip row also claims the horizontal axis
+   (touch-action:pan-x): on a phone a slightly diagonal swipe along the chips used to hand
+   the gesture to the page, which scrolled down instead. The row is 32px tall, so losing a
+   vertical scroll that happens to start on it costs nothing; the ~130px heatmap wrap keeps
+   both axes, there the trade-off goes the other way. */
+.chips,.hm-wrap{overscroll-behavior-x:contain;scroll-padding-inline:16px}
+.chips{touch-action:pan-x}
 .chip{
   flex:none;padding:6px 13px;border-radius:99px;background:var(--surface);
   font-size:14px;font-weight:400;color:var(--label);text-transform:capitalize;
@@ -486,14 +551,19 @@ h4.sec{
 .stp button:active{background:var(--surface-3)}
 .stp .val{
   flex:1;min-width:0;display:flex;align-items:baseline;justify-content:center;gap:3px;padding:0 2px;
+  align-self:stretch;
 }
 .stp .val i{font-style:normal;font-size:12px;color:var(--label-2);flex:none}
 .stp .num{
   width:100%;min-width:0;text-align:center;background:none;border:none;outline:none;
   font-size:17px;font-weight:500;letter-spacing:-.012em;padding:0;
   -moz-appearance:textfield;appearance:textfield;
+  /* the field is the whole height of the stepper, not just its 18px text line, so a tap
+     anywhere between the two buttons focuses it */
+  height:100%;min-height:40px;cursor:text;
 }
 .stp .num::-webkit-inner-spin-button{display:none}
+.stp.invalid{box-shadow:inset 0 0 0 1px var(--red)}
 
 /* --- slider --- */
 .sld{position:relative;height:32px;display:flex;align-items:center;cursor:pointer;touch-action:none}
@@ -512,12 +582,15 @@ h4.sec{
 
 /* --- checkbox --- */
 .chk,.ck{
-  width:30px;height:30px;border-radius:50%;flex:none;
+  width:30px;height:30px;border-radius:50%;flex:none;position:relative;
   display:flex;align-items:center;justify-content:center;
   background:none;box-shadow:inset 0 0 0 1.8px var(--label-4);color:transparent;
   transition:background var(--fast),box-shadow var(--fast),color var(--fast),transform var(--fast);
 }
 .chk .icn{font-size:16px;--icon-stroke:2.6}
+/* 30px is the right look next to a stepper but a poor target: extend the tap area to 44px
+   without painting it; the left side stays shorter so the stepper's + button keeps its edge */
+.chk::before,.ck::before{content:'';position:absolute;inset:-7px -7px -7px -4px}
 .chk.on{background:var(--acc);box-shadow:none;color:var(--on-acc)}
 .chk:active,.ck:active{transform:scale(.9)}
 .ck svg{
@@ -536,7 +609,7 @@ h4.sec{
   position:absolute;bottom:9px;display:inline-flex;align-items:center;gap:4px;
   background:rgba(0,0,0,.45);color:#fff;border-radius:99px;padding:5px 11px;
   font-size:12px;font-weight:500;
-  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
 }
 .exmedia .gifhint{right:9px}
 .exmedia .giftoggle{left:9px}
@@ -573,22 +646,34 @@ h4.sec{
 .setrow .stp button{width:32px;height:40px}
 /* a 3rd stepper (RIR) needs narrower buttons and a tighter row gap to fit next to weight+reps
    on narrow phones, same technique as the exercise-config sheet's three-steppers-in-a-row
-   (.cfgrow below) — RIR's own value is short ("1.5") so its buttons shrink the most, weight/reps
-   just enough to make room since their values ("82.5", "12") need more of what's left.
+   (.cfgrow below). The buttons stay 28px wide — anything narrower is a miss-prone target —
+   so the room comes from the smaller glyphs and from the value fields giving up their padding.
    The header shares the numbers so its labels stay centred over the steppers they name. */
 .setrow.eff3,.sethead.eff3{gap:6px}
 .setrow.eff3 .stp.w,.sethead.eff3 .w-sp{flex:1.2}
 .setrow.eff3 .stp.r,.sethead.eff3 .r-sp{flex:1}
 .setrow.eff3 .stp.eff,.sethead.eff3 .eff-sp{flex:.85}
-.setrow.eff3 .stp button{width:23px}
-.setrow.eff3 .stp.eff button{width:20px}
+.setrow.eff3 .stp button{width:28px;font-size:14px}
 .setrow.eff3 .stp .num{font-size:14px}
+.setrow.eff3 .stp .val{padding:0}
 .setrow.done .n{background:var(--acc);color:var(--on-acc)}
 .setrow.done{opacity:.45}
+/* drop-set drops / rest-pause bursts riding on a work row, editable like the row itself
+   (issue: drop-sets & rest-pause) */
+.subrow{display:flex;align-items:center;gap:6px;padding:3px 0 3px 32px}
+.subrow .subn{font-size:11px;color:var(--label-3);flex:none;width:46px}
+.subrow .stp.mini{flex:1;min-width:0}
+.subrow .stp.mini button{width:26px;height:30px}
+.subrow .stp.mini .num{font-size:13px;min-height:30px}
+.subrow .iconbtn{width:26px;height:26px;font-size:11px;flex:none}
+.setextra{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 8px 32px}
+.setextra .chip.add{display:inline-flex;align-items:center;gap:4px;color:var(--acc)}
+.setextra .chip.add svg{width:13px;height:13px}
+.setextra .chip.add:disabled{opacity:.35}
 /* why the next target is what it is (issue #17) */
 .progline{
-  display:flex;align-items:flex-start;gap:7px;margin:6px 0 2px;
-  font-size:13px;line-height:1.38;color:var(--acc);
+  width:100%;display:flex;align-items:flex-start;gap:7px;margin:6px 0 2px;padding:0;
+  text-align:left;font-size:13px;line-height:1.38;color:var(--acc);
 }
 .progline.warn{color:var(--yellow)}
 .progline svg{flex:none;margin-top:2px}
@@ -614,7 +699,7 @@ h4.sec{
   /* nearly opaque: the set rows underneath were reading through the old 82% and made the
      clock hard to pick out mid-set. The blur stays, so it still sits above the page. */
   background:color-mix(in srgb,var(--surface) 97%,transparent);
-  backdrop-filter:saturate(180%) blur(24px);-webkit-backdrop-filter:saturate(180%) blur(24px);
+  -webkit-backdrop-filter:saturate(180%) blur(10px);backdrop-filter:saturate(180%) blur(10px);
   border-radius:var(--r-lg);padding:12px 14px;
   display:flex;align-items:center;gap:12px;
   box-shadow:0 12px 34px -8px rgba(0,0,0,.55);
@@ -647,21 +732,31 @@ h4.sec{
 #modal-root.open{display:block}
 .mback{
   position:absolute;inset:0;background:rgba(0,0,0,.4);
-  backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);
+  -webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);
   touch-action:none;overscroll-behavior:none;
 }
 .sheet{
   position:absolute;left:0;right:0;bottom:0;background:var(--bg-el);
   border-radius:var(--r-xl) var(--r-xl) 0 0;
   padding:8px 18px calc(20px + var(--sab));
-  max-height:90vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  max-height:90vh;max-height:min(90vh,calc(100dvh - 8px));
+  overflow-y:auto;-webkit-overflow-scrolling:touch;scroll-padding-bottom:calc(20px + var(--sab));
   animation:sheetup .34s var(--ease);
   overscroll-behavior:contain;touch-action:pan-y;will-change:transform;
+}
+.sheet:has(.picker-search){
+  bottom:var(--picker-keyboard-bottom,0px);
+  max-height:min(90vh,calc(100dvh - 8px),calc(var(--picker-visual-height,100vh) - 8px));
 }
 :root[data-theme="light"] .sheet{background:var(--bg)}
 @keyframes sheetup{from{transform:translateY(100%)}to{transform:none}}
 .sheet .grab{width:36px;height:5px;border-radius:99px;background:var(--label-4);margin:6px auto 14px}
 .sheet h3{font-size:20px;font-weight:600;letter-spacing:-.021em;margin-bottom:14px}
+.picker-search{
+  position:sticky;top:0;z-index:2;margin-bottom:0;padding-bottom:10px;
+  background:var(--bg-el);
+}
+:root[data-theme="light"] .picker-search{background:var(--bg)}
 .center{
   position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
   width:min(84vw,300px);background:var(--bg-el);border-radius:var(--r-lg);padding:20px;
@@ -706,6 +801,19 @@ h4.sec{
 }
 .glyph-cell:active{transform:scale(.92)}
 .glyph-cell.on{background:var(--acc);color:var(--on-acc)}
+
+/* --- opt-in timer completion flash ---
+   Four deliberate pulses over 2.4s stay below three flashes per second. Transparent
+   gaps keep the black and white pulses visually distinct. */
+.timer-flash{
+  position:fixed;inset:0;z-index:1000;pointer-events:none;opacity:0;
+  animation:timer-flash-four 2.4s linear both;
+}
+@keyframes timer-flash-four{
+  0%,20%,28%,48%,56%,76%,84%,100%{opacity:0}
+  4%,16%,60%,72%{background:#000;opacity:1}
+  32%,44%,88%,96%{background:#fff;opacity:1}
+}
 
 /* --- big weight readout --- */
 .bwstep{display:flex;align-items:center;justify-content:center;gap:18px;margin:14px 0 6px}
@@ -794,6 +902,7 @@ h4.sec{
 
 .bm-m.sel{stroke:var(--label);stroke-width:7}
 .bodymap.tappable .bm-m{cursor:pointer}
+.bodymap.tappable .bm-m:focus-visible{outline:none;stroke:var(--label);stroke-width:7;filter:drop-shadow(0 0 2px var(--surface))}
 /* A hairline in the surface colour separates neighbouring muscles; the artwork has no
    outline path of its own, so without this the body reads as one flat blob. */
 .bm-v path{stroke:var(--surface);stroke-width:2.5;stroke-linejoin:round}
@@ -834,7 +943,7 @@ h4.sec{
   position:fixed;left:50%;transform:translateX(-50%) translateY(6px);
   bottom:calc(96px + var(--sab));z-index:200;
   background:color-mix(in srgb,var(--surface-2) 88%,transparent);
-  backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
   border-radius:99px;padding:11px 20px;font-size:15px;font-weight:500;
   box-shadow:0 10px 30px -6px rgba(0,0,0,.5);
   opacity:0;pointer-events:none;transition:opacity var(--med),transform var(--med) var(--ease);
@@ -886,6 +995,14 @@ h4.sec{
   border-radius:var(--r-lg);padding:14px;
   background:var(--surface);box-shadow:inset 0 0 0 1.5px var(--acc-line);
 }
+.workout-swipe-surface{touch-action:pan-y}
+/* A superset nests a card inside the page's own gutter, so its inset is paid twice. On a
+   narrow phone that left the weight and reps steppers too tight to show a three-digit
+   number — reported as "the reps textbox becomes too small when superset on mobile". The
+   card only gives up its own padding; the rows inside keep their spacing. */
+@media (max-width:400px){
+  .ss-card{padding:10px 8px}
+}
 .ss-hd{
   font-size:12px;font-weight:600;color:var(--acc);margin-bottom:12px;
   text-align:center;display:flex;align-items:center;justify-content:center;gap:5px;
@@ -897,13 +1014,20 @@ h4.sec{
 .today-row{
   display:flex;align-items:center;justify-content:space-between;gap:10px;
   margin-top:12px;padding:12px 14px;border-radius:var(--r);background:var(--surface-2);
-  transition:background var(--fast);width:100%;text-align:left;
+  transition:background var(--fast);width:100%;text-align:left;cursor:pointer;
 }
 .today-row:active{background:var(--surface-3)}
 .today-row .lbl2{font-size:11px;font-weight:500;letter-spacing:.03em;text-transform:uppercase;color:var(--label-3)}
 .today-row .ttl{
   font-weight:500;font-size:17px;line-height:1.25;text-transform:capitalize;
   letter-spacing:-.012em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;
+}
+
+/* Only where a pointer really hovers — on a phone :hover sticks to the row after the tap.
+   Lighter than :active, which goes all the way to --surface-3, so the two stay distinct. */
+@media (hover:hover){
+  .today-row:hover{background:color-mix(in srgb,var(--surface-2),var(--surface-3) 60%)}
+  :root[data-theme="light"] .today-row:hover{background:color-mix(in srgb,var(--surface-2),var(--surface-3) 85%)}
 }
 
 /* --------------------------------------------------- desktop (≥1000px) --- */

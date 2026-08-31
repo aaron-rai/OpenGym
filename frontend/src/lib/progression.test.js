@@ -311,6 +311,13 @@ describe('double progression', () => {
     expect(p.reps).toBe(8)
     expect(p.weight).toBe(35)           // 40 × 0.9 = 36 → nearest loadable 2.5 step
   })
+
+  it('normalizes persisted per-side bounds before prescribing', () => {
+    const perSide = { ...cfg, reps: 13, repsMin: 7, side: true }
+    const p = nextPrescription(hist(LIFT, [[40, 12, 12, 12]], { sets: 3, reps: 13 }), perSide)
+    expect(p.kind).toBe('hold')
+    expect(p.reps).toBe(14)
+  })
 })
 
 describe('timed progression', () => {
@@ -372,6 +379,25 @@ describe('sessionsFor', () => {
       ]
     }
     expect(sessionsFor(S, LIFT).map(s => s.d)).toEqual(['2026-01-01'])
+  })
+
+  it('ignores marked deload workouts when it calculates the next regular target', () => {
+    const target = { sets: 3, reps: 5, weight: 60 }
+    const entry = (weight, reps) => ({
+      id: LIFT,
+      target: { ...target, weight },
+      sets: reps.map(r => ({ w: weight, r, done: true }))
+    })
+    const S = {
+      unit: 'kg',
+      workouts: [
+        { d: '2026-01-01', entries: [entry(60, [5, 5, 5])] },
+        { d: '2026-01-08', excludeFromProgression: true, entries: [entry(30, [8, 8])] }
+      ]
+    }
+
+    expect(sessionsFor(S, LIFT).map(s => s.d)).toEqual(['2026-01-01'])
+    expect(nextPrescription(S, { id: LIFT, ...target, prog: 'linear' }).weight).toBe(62.5)
   })
 
   it('reads a legacy entry that has no target without crashing', () => {
@@ -521,5 +547,36 @@ describe('applyPrescription never touches warm-up rows (round 3)', () => {
     ]
     const out = applyPrescription(sets, { kind: 'up', weight: 62.5, reps: 5, sets: 4 })
     expect(out).toEqual(sets) // no work row to seed growth from - nothing grows, no loop
+  })
+})
+
+describe('drop-sets and rest-pause sets in progression', () => {
+  it('readSession judges a drop-set row on its own main weight/reps, ignoring the drops', () => {
+    const withDrops = readSession({ id: LIFT, target: { sets: 1, reps: 5 }, sets: [
+      { type: 'dropset', w: 60, r: 5, done: true, drops: [{ w: 40, r: 8 }, { w: 20, r: 10 }] },
+    ] })
+    const plain = readSession({ id: LIFT, target: { sets: 1, reps: 5 }, sets: [{ w: 60, r: 5, done: true }] })
+    expect(withDrops).toEqual(plain)
+  })
+
+  it('readSession judges a rest-pause row on its activation weight/reps, ignoring the bursts', () => {
+    const withBursts = readSession({ id: LIFT, target: { sets: 1, reps: 8 }, sets: [
+      { type: 'restpause', w: 60, r: 8, done: true, clusters: [{ r: 4, restSec: 15 }, { r: 3, restSec: 15 }] },
+    ] })
+    const plain = readSession({ id: LIFT, target: { sets: 1, reps: 8 }, sets: [{ w: 60, r: 8, done: true }] })
+    expect(withBursts).toEqual(plain)
+  })
+
+  it('applyPrescription still rewrites a drop-set/rest-pause row\'s own weight, leaving its drops/clusters untouched', () => {
+    const sets = [{ type: 'dropset', w: 60, r: 5, done: false, drops: [{ w: 40, r: 8 }] }]
+    const out = applyPrescription(sets, { kind: 'up', weight: 62.5 })
+    expect(out[0]).toEqual({ type: 'dropset', w: 62.5, r: 5, done: false, drops: [{ w: 40, r: 8 }] })
+  })
+
+  it('a newly grown row keeps the seed\'s planned type but not its already-logged drops/clusters', () => {
+    const sets = [{ type: 'dropset', w: 0, r: 10, done: false, drops: [{ w: 0, r: 12 }] }]
+    const out = applyPrescription(sets, { kind: 'up', weight: 0, reps: 10, sets: 2 })
+    expect(out).toHaveLength(2)
+    expect(out[1]).toEqual({ type: 'dropset', w: 0, r: 10, done: false })
   })
 })

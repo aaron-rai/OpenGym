@@ -16,9 +16,10 @@
 //   · fewer sets than prescribed                       → miss
 // So a session that fell apart can never advance the load as though it had succeeded.
 
-import { modeOf, repStep } from './history.js'
+import { modeOf, repStep, rerampWarmups } from './history.js'
 import { EXIDX } from './exercises.js'
 import { isWarmupRow } from './workout-model.js'
+import { normalizeRepRange } from './rep-range.js'
 
 export const POLICIES = ['off', 'linear', 'greyskull', 'double', 'time']
 
@@ -134,6 +135,10 @@ export function readSession(entry, fallback) {
 export function sessionsFor(S, exId, fallback) {
   const out = []
   ;(S.workouts || []).forEach(w => {
+    // A planned deload remains a real workout for history and statistics, but it cannot become
+    // the baseline for the next regular prescription. The routine flag is copied onto the
+    // active session, then onto this completed workout, so later routine edits do not rewrite it.
+    if (w.excludeFromProgression === true) return
     const entry = w.entries.find(e => e.id === exId)
     if (entry && entry.sets.some(s => s.done && !isWarmupRow(s))) out.push({ d: w.d, ...readSession(entry, fallback) })
   })
@@ -210,8 +215,9 @@ export function nextPrescription(S, cfg, routine) {
     return { policy, kind: 'up', weight: 0, reps: next, why: ['Bodyweight — every rep last time, so go for {0} this time.', next] }
   }
   if (policy === 'double') {
-    const top = cfg.reps || last.goal || 10
-    const bottom = Math.min(cfg.repsMin || Math.max(1, top - 2), top)
+    const range = normalizeRepRange(cfg.reps || last.goal || 10, cfg.repsMin, repStep(cfg))
+    const top = range.reps
+    const bottom = range.repsMin
     if (last.ok) return { policy, kind: 'up', weight: snap(w + inc, inc), reps: bottom, why: ['Top of the rep range in every set — {0} {1} more, back to {2} reps.', inc, unit, bottom] }
     if (stalls >= deloadAt) {
       const dw = deloadTo(w, inc)
@@ -250,7 +256,7 @@ export function nextPrescription(S, cfg, routine) {
  * Apply a prescription to freshly built sets. Only the fields the policy actually decided
  * are touched, and only on sets that have not been logged yet.
  */
-export function applyPrescription(sets, p) {
+export function applyPrescription(sets, p, step = 2.5) {
   if (!p || p.kind === 'off' || p.kind === 'first') return sets
   const out = sets.map(s => {
     // Never rewrite a logged set, and never rewrite a warm-up: the prescription speaks to
@@ -270,9 +276,16 @@ export function applyPrescription(sets, p) {
   if (p.sets > workRows.length) {
     // An all-warm-up entry has no work row to seed growth from - growing warm-up copies
     // would both invent work and never terminate the loop. Leave the entry untouched.
-    if (!workRows.length) return out
+    if (!workRows.length) return rerampWarmups(out, step)
     const seed = workRows[workRows.length - 1]
-    while (out.filter(s => !isWarmupRow(s)).length < p.sets) out.push({ ...seed, done: false })
+    // A freshly appended row hasn't been performed, so it never inherits a seed's already-
+    // logged drops/clusters — that would invent extra work the row never actually did. Its
+    // `type` is kept: that's the exercise's plan (every set is a drop-set/rest-pause), not
+    // something this particular row logged.
+    const { drops, clusters, ...plainSeed } = seed
+    while (out.filter(s => !isWarmupRow(s)).length < p.sets) out.push({ ...plainSeed, done: false })
   }
-  return out
+  // Last, because the work rows now carry their final weight: the warm-up block ramps toward
+  // what you are actually about to lift, not toward what you lifted last time.
+  return rerampWarmups(out, step)
 }
