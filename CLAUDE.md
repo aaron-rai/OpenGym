@@ -20,7 +20,7 @@ mcp/       optional MCP server — read-only stdio bridge exposing a user's work
            balance to LLM clients (Claude Desktop, Cursor…). Not part of the Docker build; only
            runs when an LLM client spawns it.
 media/     exercise img/gif, gitignored, fetched at runtime by the `media` compose service.
-website/   static marketing site (plain HTML/CSS/JS), deployed separately by .gitlab-ci.yml.
+website/   static marketing site (plain HTML/CSS/JS) from upstream; not deployed by this fork.
 docs/      SELF_HOSTING.md, MOBILE.md.
 ```
 
@@ -51,11 +51,13 @@ cd frontend && npm run build:mobile   # + cap sync, points media at the CDN data
 There is no linter/formatter configured (no ESLint/Prettier config in the repo) and no
 TypeScript — match the existing style by hand.
 
-The CI gate is `.gitlab-ci.yml` on GitLab, the canonical remote (see README): it runs the
-`frontend/` tests on Node 22 — the same version as `web/Dockerfile` / `api/Dockerfile`
-(`node:22-alpine`) — and additionally builds and publishes the Docker images, packages the
-signed Android APK, and deploys the demo/docs site. The Gitea and GitHub workflow copies
-(`.gitea/workflows/`, `.github/workflows/`) are dormant mirrors; neither host runs them.
+The CI gate is `.github/workflows/test.yaml` on GitHub, this fork's canonical remote: it runs the
+`frontend/` and `mcp/` tests on Node 22 — the same version as `web/Dockerfile` / `api/Dockerfile`
+(`node:22-alpine`) — plus a production build, the locale/string checks and the fatigue-model
+probe. `.github/workflows/docker-publish.yaml` builds and publishes the `api`/`web` images to
+GHCR on a push to `main` or a published release. Upstream's GitLab CI (`.gitlab-ci.yml`) and
+Gitea workflows were removed here along with the GitLab/Gitea issue templates — this fork does
+not use those hosts.
 
 ## Architecture
 
