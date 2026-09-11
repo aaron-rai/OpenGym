@@ -37,7 +37,7 @@ cd frontend && npm test
   State lives in the Zustand store (`src/store`); pure helpers in `src/lib`.
 - **Don't commit** the exercise media (`media/`) or `data/` — they're gitignored.
 - **Test the flow** you touched — click through the affected screens (and the workout flow) in a
-  browser before opening a merge request.
+  browser before opening a pull request.
 - **Training logic gets a unit test.** Anything deciding what you lift next, or reading a logged
   session back, belongs in a pure helper in `src/lib` with tests beside it (`npm test`). These
   rules are easy to get subtly wrong and nearly impossible to verify by clicking — the
@@ -75,17 +75,14 @@ here before, otherwise a maintainer presses "Run pipeline" after a first look at
 
 | You have | Goes to |
 | --- | --- |
-| A quick question, or you'd rather just chat | [The Discord](https://discord.gg/e62jY6fwVb) |
-| A question, or self-hosting that won't behave | [An issue labelled `question`](https://github.com/DuarteSantos8/openGym/issues) |
-| An idea you're not sure about yet | [An issue labelled `idea`](https://github.com/DuarteSantos8/openGym/issues) |
-| A reproducible bug | [Issues](https://github.com/DuarteSantos8/openGym/issues) |
-| A change you've already built | [A pull request](https://github.com/DuarteSantos8/openGym/pulls) |
+| A question, or self-hosting that won't behave | [An issue labelled `question`](https://github.com/aaron-rai/OpenGym/issues) |
+| An idea you're not sure about yet | [An issue labelled `idea`](https://github.com/aaron-rai/OpenGym/issues) |
+| A reproducible bug | [Issues](https://github.com/aaron-rai/OpenGym/issues) |
+| A change you've already built | A pull request |
 
-Questions and ideas are issues too (one tracker is enough) — just labelled, so nobody
-mistakes a question for agreed-on work. An answered question is worth more than the same answer
-in a chat log: the next person searching "passkey login fails behind my reverse proxy" finds it.
-That is the one thing the Discord can't do, so if an answer there turns out to be worth keeping,
-it belongs in an issue afterwards.
+Questions and ideas are issues too — just labelled, so nobody mistakes a question for agreed-on
+work. An answered question is worth more than the same answer in chat: the next person searching
+"passkey login fails behind my reverse proxy" finds it.
 
 ## Reporting bugs
 

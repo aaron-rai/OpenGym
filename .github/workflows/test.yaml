@@ -11,9 +11,9 @@ on:
       - 'scripts/build-coach-assets.mjs'
       - 'scripts/build-coach-library.mjs'
       - 'api/coach/prompts/**'
-      - '.github/workflows/test.yml'
+      - '.github/workflows/test.yaml'
   push:
-    branches: [main, coach]
+    branches: [main]
     paths:
       - 'frontend/**'
       - 'api/**'
@@ -21,7 +21,7 @@ on:
       - 'scripts/build-coach-assets.mjs'
       - 'scripts/build-coach-library.mjs'
       - 'api/coach/prompts/**'
-      - '.github/workflows/test.yml'
+      - '.github/workflows/test.yaml'
   workflow_dispatch:
 
 permissions:

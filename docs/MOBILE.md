@@ -85,32 +85,8 @@ accounts, no store rules, no yearly fees between you and an open-source app.
 
 ### Android — sideload the APK
 
-The official signed APK is in four places, all the same file:
-
-- **[opengym.duarte-santos.ch](https://opengym.duarte-santos.ch)** — the download page.
-- **[GitLab's package registry](https://gitlab.com/DuarteSantos8/opengym/-/packages)** — every
-  build under `opengym-android/<version>/`, with a `.sha256` beside it. Direct link, no login:
-  `https://gitlab.com/api/v4/projects/85678327/packages/generic/opengym-android/<version>/openGym-<version>.apk`
-- **[The GitHub release](https://github.com/DuarteSantos8/openGym/releases)** for that version,
-  with the APK and its `.sha256` attached as release assets.
-- **[The GitLab release](https://gitlab.com/DuarteSantos8/opengym/-/releases)** on the mirror,
-  where the file is built; it links to the package registry above.
-
-Android asks you to allow installs from the browser the first time — that's standard for any
-app outside the Play Store. Check the `.sha256` if you got the file from anywhere else.
-
-Both come out of CI: the `build:apk` job in [`.gitlab-ci.yml`](../.gitlab-ci.yml) runs
-`npm run build:mobile` and `./gradlew assembleRelease`, then `zipalign`s and signs the result
-with the release key. The job runs on every push to `main` too, so the newest unreleased
-build is always one click away (signed with the same key, installs over a release):
-`https://gitlab.com/DuarteSantos8/opengym/-/jobs/artifacts/main/browse?job=build:apk`
-— a 30-day job artifact, not a package, and not what the in-app updater offers. The key lives in *protected* CI variables (`ANDROID_KEYSTORE_B64`,
-`ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`), so it only exists on `main` and on `v*`
-tags — a merge request from a fork can build an APK, but gets an unsigned one and never sees
-the key. On a `v*` tag the signed APK is also pushed to the generic package registry, which is
-what the release links to.
-
-To build and sign your own:
+This fork doesn't run a CI job that builds and signs a release APK, so there's no download
+link — build and sign your own instead:
 
 ```sh
 cd frontend && npm run build:mobile
